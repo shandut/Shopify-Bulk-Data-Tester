@@ -12,13 +12,15 @@ ProductCreator/
 │   │   ├── services/        # Business logic layer
 │   │   ├── utils/           # Helper utilities
 │   │   ├── routes/          # Express route definitions
-│   │   ├── middleware/      # Express middleware
+│   │   ├── middleware/      # Express middleware (includes auth)
 │   │   ├── config/          # Configuration management
 │   │   └── app.js          # Express application setup
 │   ├── server.js           # Application entry point
 │   └── README.md           # Backend documentation
 ├── src/                    # React Frontend
-│   ├── App.js             # Main React component
+│   ├── components/         # React components (Settings)
+│   ├── context/           # React Context (SettingsContext)
+│   ├── App.js             # Main React component with tabs
 │   └── index.js           # React app entry point
 ├── public/                # Static frontend assets
 └── package.json           # Full-stack dependencies
@@ -39,9 +41,19 @@ npm install
 ```
 
 ### 2. Environment Setup
+
+#### Option A: Use the Settings Interface (Recommended)
+1. Start the application (`npm run dev`)
+2. Navigate to the **Settings** tab in the UI
+3. Enter your Shopify credentials:
+   - Store URL (e.g., `your-shop` or `your-shop.myshopify.com`)
+   - API Access Token (e.g., `shpat_xxxxx`)
+4. Click **Save Settings** - changes apply immediately without restart!
+
+#### Option B: Manual Configuration
 Create `.env` file in the project root:
 ```env
-SHOPIFY_SHOP=your-shop.myshopify.com
+SHOP=your-shop.myshopify.com
 SHOPIFY_ACCESS_TOKEN=shpat_your_access_token
 SHOPIFY_API_VERSION=2025-07
 PORT=4000
@@ -84,6 +96,8 @@ npm start
 ### 📦 Product Management
 - `POST /products/create` - Create 30,000 products
 - `POST /products/create-more` - Create additional products
+- `DELETE /products/delete-dummy` - Delete all products with "dummy" in title/handle
+- `GET /products/shop-info` - Get connected shop information
 - `GET /products/bulk-operation-status` - Check bulk operation status
 
 ### 📊 Inventory Management
@@ -98,15 +112,29 @@ npm start
 - `POST /prices/update` - Update prices (parallel)
 - `POST /prices/update-bulk` - Update prices (bulk operations)
 
+### ⚙️ Settings Management
+- `GET /api/settings` - Get current settings
+- `POST /api/settings` - Update API credentials
+
 ## 🎮 Frontend Features
 
 ### 🔧 System Status
 - Backend health monitoring
 - Real-time connection status
+- **Shop information display** (name, currency, plan, timezone)
+- **Connected store verification**
+
+### ⚙️ Settings Management (New!)
+- **Dynamic API credential configuration**
+- **No restart required for changes**
+- **Automatic URL formatting and validation**
+- **Secure token validation (shpat_/shpua_ prefix check)**
+- **Persistent storage in .env file**
 
 ### 📦 Product Management
 - Create 30,000 dummy products with one click
 - Add more products incrementally
+- **Delete all dummy products (Ultra-Fast)** - Dynamic parallelism
 - Monitor bulk operation progress
 
 ### 📊 Inventory Management
@@ -134,12 +162,16 @@ npm start
 - **Professional Logging**: Structured timestamps and data
 - **Error Handling**: Comprehensive middleware
 - **Configuration Management**: Environment variables
+- **Request-Scoped Authentication**: Per-request Shopify service instances
+- **Context-Based State Management**: React Context API for settings
 
 ### ⚡ Performance Optimizations
 - **Dynamic Throttling**: Adapts to Shopify API limits
-- **Parallel Processing**: Maximum throughput
+- **Ultra-Fast Delete Operations**: Dynamic parallelism up to 200 concurrent deletions
+- **Aggressive Parallel Processing**: Maximum throughput for all operations
 - **Intelligent Batching**: 250 items per mutation
 - **Memory Efficiency**: Streaming for large datasets
+- **Smart Batch Sizing**: Automatically adjusts based on available API points
 
 ### 🛡️ Security & Reliability
 - Environment variable configuration
@@ -151,7 +183,8 @@ npm start
 
 ### 30,000 Products
 - **Product Creation**: ~2-5 minutes (bulk operations)
-- **Inventory Updates**: ~3-4 seconds (parallel processing)
+- **Product Deletion (Dummy)**: ~15-30 seconds (dynamic parallel)
+- **Inventory Updates**: ~3-4 seconds (aggressive parallel)
 - **Price Updates**: ~30 seconds (bulk) vs ~2-3 minutes (parallel)
 
 ### Scalability
@@ -215,6 +248,15 @@ export NODE_ENV=production
 # Start the server
 npm start
 ```
+
+## 🆕 Latest Updates (v2.0)
+
+### Major New Features
+- **Settings Management**: Configure API credentials through the UI without restarts
+- **Ultra-Fast Delete**: Delete thousands of dummy products in seconds with dynamic parallelism
+- **Shop Info Display**: Real-time display of connected store information
+- **Request-Scoped Auth**: Each API request uses its own authentication context
+- **Aggressive Parallel Processing**: All inventory operations now use maximum parallelism
 
 ## 🔄 Migration from Legacy
 
