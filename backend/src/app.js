@@ -1,13 +1,14 @@
 const express = require('express');
 const cors = require('cors');
-const config = require('./config/shopify');
 const logger = require('./utils/logger');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
+const shopifyAuth = require('./middleware/shopifyAuth');
 
 // Import routes
 const inventoryRoutes = require('./routes/inventory');
 const productRoutes = require('./routes/products');
 const priceRoutes = require('./routes/prices');
+const settingsRoutes = require('./routes/settings');
 
 // Create Express app
 const app = express();
@@ -26,19 +27,20 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check endpoint
+// Health check endpoint (no auth required)
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development'
-  });
+  res.json({ status: 'ok', uptime: process.uptime() });
 });
 
+// Settings routes (no auth required)
+app.use('/api/settings', settingsRoutes);
+
+// Apply Shopify auth middleware to all other routes
+app.use(shopifyAuth);
+
 // API routes
-app.use('/inventory', inventoryRoutes);
 app.use('/products', productRoutes);
+app.use('/inventory', inventoryRoutes);
 app.use('/prices', priceRoutes);
 
 // Legacy route mappings for backward compatibility

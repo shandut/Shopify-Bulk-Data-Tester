@@ -1,4 +1,3 @@
-const shopifyService = require('./shopifyService');
 const cache = require('../utils/cache');
 const logger = require('../utils/logger');
 
@@ -31,7 +30,7 @@ class InventoryService {
   /**
    * Enable tracking for inventory items in parallel batches
    */
-  async enableTracking(products) {
+  async enableTracking(products, shopifyService) {
     const startTime = Date.now();
     logger.info('Starting inventory tracking enablement');
 
@@ -126,7 +125,7 @@ class InventoryService {
   /**
    * Update inventory quantities using setOnHandQuantities
    */
-  async updateOnHandQuantities(products, locationId) {
+  async updateOnHandQuantities(products, locationId, shopifyService) {
     const startTime = Date.now();
     logger.info('Starting on-hand quantity updates');
 
@@ -177,21 +176,17 @@ class InventoryService {
   }
 
   /**
-   * Set available quantities with dynamic throttle adjustment
+   * Set available quantities with aggressive parallel processing
    */
-  async setAvailableQuantities(products, locationId) {
+  async setAvailableQuantities(products, locationId, shopifyService) {
     const startTime = Date.now();
     logger.info('Starting available quantity updates');
 
     const quantities = this.prepareInventoryItems(products, locationId);
     const batches = this.createBatches(quantities);
 
-    let results = [];
-    let throttleWarning = false;
-    let throttleError = false;
-    const throttleThreshold = 2000;
-
-    const sendBatch = async (batch, idx) => {
+    // Aggressive parallel processing - send all batches at once
+    const qtyPromises = batches.map((batch, idx) => {
       const mutation = `
         mutation inventorySetQuantities($input: InventorySetQuantitiesInput!) {
           inventorySetQuantities(input: $input) {
@@ -203,64 +198,32 @@ class InventoryService {
       
       const variables = {
         input: {
-          name: "available",
           reason: "correction",
-          quantities: batch,
-          ignoreCompareQuantity: true
+          setQuantities: batch
         }
       };
 
       logger.batch('SET_AVAILABLE', idx, batches.length, batch.length);
 
-      try {
-        const response = await shopifyService.graphql(mutation, variables);
-        
-        if (response.extensions?.cost?.throttleStatus) {
-          const throttle = response.extensions.cost.throttleStatus;
-          if (throttle.currentlyAvailable < throttleThreshold) {
-            throttleWarning = true;
+      return shopifyService.graphql(mutation, variables)
+        .then(response => {
+          if (response.data?.inventorySetQuantities?.userErrors?.length > 0) {
+            logger.error(`Batch ${idx} userErrors`, response.data.inventorySetQuantities.userErrors);
           }
-        }
+          return { batch: idx, response };
+        })
+        .catch(error => {
+          logger.error(`Batch ${idx} request error`, error.response?.data || error);
+          return { batch: idx, error };
+        });
+    });
 
-        if (response.errors) {
-          logger.error(`Batch ${idx + 1} GraphQL errors`, response.errors);
-        }
-
-        if (response.data?.inventorySetQuantities?.userErrors?.length > 0) {
-          logger.error(`Batch ${idx + 1} userErrors`, response.data.inventorySetQuantities.userErrors);
-        }
-
-        return { batch: idx, response };
-      } catch (error) {
-        if (error.response?.data?.errors?.some(e => 
-          e.message?.toLowerCase().includes('throttle'))) {
-          throttleError = true;
-          logger.error(`Throttle error on batch ${idx + 1}`);
-        } else {
-          logger.error(`Batch ${idx + 1} request error`, error.response?.data || error);
-        }
-        return { batch: idx, error };
-      }
-    };
-
-    // Send all batches in parallel
-    results = await Promise.all(batches.map((batch, idx) => sendBatch(batch, idx)));
-
-    // Retry failed batches with delay if throttling detected
-    if (throttleWarning || throttleError) {
-      logger.warn('Throttle warning or error detected. Retrying failed batches with delay.');
-      const failed = results.filter(r => r.error);
-      
-      for (const r of failed) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        const retryResult = await sendBatch(batches[r.batch], r.batch);
-        results[r.batch] = retryResult;
-      }
-    }
-
+    // Wait for all batches to complete in parallel
+    const results = await Promise.all(qtyPromises);
     const elapsedSeconds = ((Date.now() - startTime) / 1000).toFixed(2);
+    
     logger.timing('SET_AVAILABLE', elapsedSeconds, `${quantities.length} items`);
-
+    
     return {
       results,
       elapsedSeconds,
@@ -269,7 +232,7 @@ class InventoryService {
   }
 
   /**
-   * Create batches from array of items
+   * Create batches of items
    */
   createBatches(items) {
     const batches = [];
@@ -280,12 +243,13 @@ class InventoryService {
   }
 
   /**
-   * Full inventory update (enable tracking + set quantities)
+   * Full inventory update (enable tracking + update quantities)
    */
-  async fullInventoryUpdate(useCache = true) {
-    let products;
+  async fullInventoryUpdate(shopifyService) {
+    logger.info('Starting full inventory update');
     
-    if (useCache && cache.exists()) {
+    let products;
+    if (cache.exists()) {
       products = cache.load();
     } else {
       products = await shopifyService.fetchAllProducts();
@@ -293,17 +257,16 @@ class InventoryService {
     }
 
     const locationId = await shopifyService.getFirstLocationId();
-
-    // Step 1: Enable tracking
-    const enableResult = await this.enableTracking(products);
-
-    // Step 2: Update quantities
-    const updateResult = await this.updateOnHandQuantities(products, locationId);
-
+    
+    // Enable tracking first
+    const trackingResult = await this.enableTracking(products, shopifyService);
+    
+    // Then update quantities
+    const quantityResult = await this.updateOnHandQuantities(products, locationId, shopifyService);
+    
     return {
-      enableTracking: enableResult,
-      updateQuantities: updateResult,
-      totalProducts: products.length
+      tracking: trackingResult,
+      quantities: quantityResult
     };
   }
 }

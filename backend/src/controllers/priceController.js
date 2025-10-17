@@ -1,9 +1,12 @@
 const fs = require('fs');
 const axios = require('axios');
 const FormData = require('form-data');
-const shopifyService = require('../services/shopifyService');
+const ShopifyService = require('../services/shopifyService');
 const cache = require('../utils/cache');
 const logger = require('../utils/logger');
+
+// Get Shopify service instance for the current request
+const getShopifyService = (req) => new ShopifyService(req.shopifyConfig);
 
 class PriceController {
   constructor() {
@@ -16,6 +19,7 @@ class PriceController {
   async updatePrices(req, res) {
     try {
       logger.info('Price update requested (individual approach)');
+      const shopifyService = getShopifyService(req);
       
       if (!cache.exists()) {
         return res.status(400).json({ 
@@ -155,6 +159,7 @@ class PriceController {
   async updatePricesBulk(req, res) {
     try {
       logger.info('Bulk price update requested (bulk operations approach)');
+      const shopifyService = getShopifyService(req);
       
       if (!cache.exists()) {
         return res.status(400).json({ 
@@ -245,9 +250,8 @@ class PriceController {
   }
 }
 
-// Export an instance with properly bound methods
-const priceController = new PriceController();
+// Export controller methods individually
 module.exports = {
-  updatePrices: priceController.updatePrices.bind(priceController),
-  updatePricesBulk: priceController.updatePricesBulk.bind(priceController)
+  updatePrices: (req, res) => new PriceController().updatePrices(req, res),
+  updatePricesBulk: (req, res) => new PriceController().updatePricesBulk(req, res)
 }; 

@@ -1,7 +1,10 @@
 const inventoryService = require('../services/inventoryService');
-const shopifyService = require('../services/shopifyService');
+const ShopifyService = require('../services/shopifyService');
 const cache = require('../utils/cache');
 const logger = require('../utils/logger');
+
+// Get Shopify service instance for the current request
+const getShopifyService = (req) => new ShopifyService(req.shopifyConfig);
 
 class InventoryController {
   /**
@@ -10,6 +13,7 @@ class InventoryController {
   async refreshCache(req, res) {
     try {
       logger.info('Cache refresh requested');
+      const shopifyService = getShopifyService(req);
       const products = await shopifyService.fetchAllProducts();
       const count = cache.save(products);
       
@@ -33,6 +37,7 @@ class InventoryController {
   async enableTracking(req, res) {
     try {
       logger.info('Enable tracking requested');
+      const shopifyService = getShopifyService(req);
       
       if (!cache.exists()) {
         return res.status(400).json({ 
@@ -42,7 +47,7 @@ class InventoryController {
       }
 
       const products = cache.load();
-      const result = await inventoryService.enableTracking(products);
+      const result = await inventoryService.enableTracking(products, shopifyService);
       
       res.json({ 
         success: true, 
@@ -65,6 +70,7 @@ class InventoryController {
   async updateQuantities(req, res) {
     try {
       logger.info('Update quantities requested');
+      const shopifyService = getShopifyService(req);
       
       if (!cache.exists()) {
         return res.status(400).json({ 
@@ -75,7 +81,7 @@ class InventoryController {
 
       const products = cache.load();
       const locationId = await shopifyService.getFirstLocationId();
-      const result = await inventoryService.updateOnHandQuantities(products, locationId);
+      const result = await inventoryService.updateOnHandQuantities(products, locationId, shopifyService);
       
       res.json({ 
         success: true, 
@@ -97,6 +103,7 @@ class InventoryController {
   async setAvailableQuantities(req, res) {
     try {
       logger.info('Set available quantities requested');
+      const shopifyService = getShopifyService(req);
       
       if (!cache.exists()) {
         return res.status(400).json({ 
@@ -107,7 +114,7 @@ class InventoryController {
 
       const products = cache.load();
       const locationId = await shopifyService.getFirstLocationId();
-      const result = await inventoryService.setAvailableQuantities(products, locationId);
+      const result = await inventoryService.setAvailableQuantities(products, locationId, shopifyService);
       
       res.json({ 
         success: true, 
@@ -129,8 +136,9 @@ class InventoryController {
   async fullUpdate(req, res) {
     try {
       logger.info('Full inventory update requested');
+      const shopifyService = getShopifyService(req);
       
-      const result = await inventoryService.fullInventoryUpdate();
+      const result = await inventoryService.fullInventoryUpdate(shopifyService);
       
       res.json({ 
         success: true, 
@@ -156,6 +164,7 @@ class InventoryController {
       const csvParse = require('csv-parse/sync');
       
       logger.info('CSV inventory update requested');
+      const shopifyService = getShopifyService(req);
       
       // Read CSV file
       const csvFile = 'inventory_update.csv';
@@ -313,4 +322,12 @@ class InventoryController {
   }
 }
 
-module.exports = new InventoryController(); 
+// Export controller methods individually
+module.exports = {
+  refreshCache: (req, res) => new InventoryController().refreshCache(req, res),
+  enableTracking: (req, res) => new InventoryController().enableTracking(req, res),
+  updateQuantities: (req, res) => new InventoryController().updateQuantities(req, res),
+  setAvailableQuantities: (req, res) => new InventoryController().setAvailableQuantities(req, res),
+  updateFromCSV: (req, res) => new InventoryController().updateFromCSV(req, res),
+  fullUpdate: (req, res) => new InventoryController().fullUpdate(req, res)
+}; 

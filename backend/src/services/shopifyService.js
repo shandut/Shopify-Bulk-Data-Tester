@@ -1,11 +1,10 @@
 const axios = require('axios');
-const config = require('../config/shopify');
 const logger = require('../utils/logger');
 
 class ShopifyService {
-  constructor() {
-    this.graphqlUrl = config.shopify.graphqlUrl;
-    this.headers = config.shopify.headers;
+  constructor(config) {
+    this.graphqlUrl = config.graphqlUrl;
+    this.headers = config.headers;
   }
 
   /**
@@ -74,20 +73,23 @@ class ShopifyService {
   /**
    * Fetch all products matching a query with pagination
    */
-  async fetchAllProducts(searchQuery = "title:Dummy Product*") {
+  async fetchAllProducts(searchQuery = "") {
     let products = [];
     let hasNextPage = true;
     let endCursor = null;
 
+    logger.info(`Starting to fetch all products with query: "${searchQuery || 'NO FILTER - ALL PRODUCTS'}"`);
+
     while (hasNextPage) {
       const query = `{
-        products(first: 100, query: "${searchQuery}"${endCursor ? `, after: "${endCursor}"` : ""}) {
+        products(first: 100${searchQuery ? `, query: "${searchQuery}"` : ""}${endCursor ? `, after: "${endCursor}"` : ""}) {
           pageInfo { hasNextPage }
           edges {
             cursor
             node {
               id
               title
+              handle
               variants(first: 100) {
                 edges {
                   node {
@@ -110,9 +112,11 @@ class ShopifyService {
       if (hasNextPage) {
         endCursor = data.edges[data.edges.length - 1].cursor;
       }
+      
+      logger.info(`Fetched page with ${data.edges.length} products, total so far: ${products.length}`);
     }
 
-    logger.info(`Fetched ${products.length} products from Shopify`);
+    logger.info(`Finished fetching products. Total: ${products.length} products from Shopify`);
     return products;
   }
 
@@ -199,6 +203,58 @@ class ShopifyService {
 
     return response.data.bulkOperationRunMutation.bulkOperation;
   }
+
+  /**
+   * Fetch basic shop information
+   */
+  async getShopInfo() {
+    const query = `
+      query {
+        shop {
+          name
+          description
+          email
+          currencyCode
+          primaryDomain {
+            host
+            url
+          }
+          plan {
+            displayName
+            partnerDevelopment
+            shopifyPlus
+          }
+          myshopifyDomain
+          id
+          contactEmail
+          currencyFormats {
+            moneyFormat
+            moneyWithCurrencyFormat
+          }
+          timezoneAbbreviation
+          timezoneOffset
+          billingAddress {
+            country
+            countryCode
+            city
+            province
+            provinceCode
+            zip
+            address1
+            address2
+          }
+        }
+      }
+    `;
+
+    const response = await this.graphql(query);
+    
+    if (response.errors) {
+      throw new Error(`Failed to fetch shop info: ${JSON.stringify(response.errors)}`);
+    }
+
+    return response.data.shop;
+  }
 }
 
-module.exports = new ShopifyService(); 
+module.exports = ShopifyService; 
