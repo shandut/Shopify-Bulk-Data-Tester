@@ -1,5 +1,5 @@
 {
-  "name": "shopify-bulk-data-testing",
+  "name": "shopify-bulk-data-tester",
   "version": "1.0.0",
   "description": "Shopify bulk data testing tool for product creation, inventory, and pricing at scale",
   "main": "backend/server.js",

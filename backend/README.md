@@ -1,4 +1,4 @@
-# Shopify Bulk Data Testing Backend
+# Shopify Bulk Data Tester Backend
 
 A Node.js backend for testing high-volume Shopify Admin API workflows across product creation/deletion, inventory updates, cache refreshes, location handling, pricing, and OAuth app install flows.
 
@@ -60,8 +60,8 @@ backend/
 
 1. **Clone and Install**:
    ```bash
-   git clone https://github.com/shandut/ProductCreator.git
-   cd ProductCreator
+   git clone https://github.com/shandut/Shopify-Bulk-Data-Tester.git
+   cd Shopify-Bulk-Data-Tester
    npm install
    ```
 

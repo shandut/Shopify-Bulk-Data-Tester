@@ -1,11 +1,11 @@
-# Shopify Bulk Data Testing
+# Shopify Bulk Data Tester
 
 A full-stack testing tool for high-volume Shopify Admin API workflows: bulk product creation/deletion, inventory cache refreshes, location-aware inventory updates, and pricing updates. Built with **React + Shopify Polaris** frontend and **Node.js + Express** backend.
 
 ## 🏗️ Architecture
 
 ```
-shopify-bulk-data-testing/
+Shopify-Bulk-Data-Tester/
 ├── backend/                 # Professional Node.js Backend
 │   ├── src/
 │   │   ├── controllers/     # HTTP request handlers
@@ -35,8 +35,8 @@ shopify-bulk-data-testing/
 
 ### 1. Installation
 ```bash
-git clone https://github.com/shandut/ProductCreator.git
-cd ProductCreator
+git clone https://github.com/shandut/Shopify-Bulk-Data-Tester.git
+cd Shopify-Bulk-Data-Tester
 npm install
 ```
 
