@@ -58,12 +58,12 @@ class InventoryService {
         }
 
         logger.warn(`Not enough query cost. Current: ${availableQueryCost}, Needed: ${maxBatchSize * 10}. Waiting...`);
-        
+
         const throttle = await shopifyService.getThrottleStatus();
         if (throttle) {
           availableQueryCost = throttle.currentlyAvailable;
         }
-        
+
         await new Promise(r => setTimeout(r, 500));
         continue;
       } else {
@@ -75,23 +75,23 @@ class InventoryService {
 
       for (let b = 0; b < batchesThisRound; b++) {
         const batch = enableItems.slice(b * maxBatchSize, (b + 1) * maxBatchSize);
-        
-        const mutationParts = batch.map((item, idx) => 
-          `t${idx}: inventoryItemUpdate(id: "${item.inventoryItemId}", input: {tracked: true}) { 
-            inventoryItem { id tracked } 
-            userErrors { message } 
+
+        const mutationParts = batch.map((item, idx) =>
+          `t${idx}: inventoryItemUpdate(id: "${item.inventoryItemId}", input: {tracked: true}) {
+            inventoryItem { id tracked }
+            userErrors { message }
           }`
         );
 
         const enableTrackingMutation = `mutation {\n${mutationParts.join('\n')}\n}`;
-        
+
         batchPromises.push(
           shopifyService.graphql(enableTrackingMutation)
             .then(response => {
               if (response.extensions?.cost?.throttleStatus) {
                 availableQueryCost = response.extensions.cost.throttleStatus.currentlyAvailable;
               }
-              
+
               if (response.data) {
                 Object.entries(response.data).forEach(([alias, mutationResult]) => {
                   if (mutationResult.userErrors?.length > 0) {
@@ -99,7 +99,7 @@ class InventoryService {
                   }
                 });
               }
-              
+
               return { batch: enableBatchIndex, response };
             })
             .catch(error => {
@@ -107,7 +107,7 @@ class InventoryService {
               return { batch: enableBatchIndex, error };
             })
         );
-        
+
         enableBatchIndex++;
       }
 
@@ -118,7 +118,7 @@ class InventoryService {
 
     const elapsedSeconds = ((Date.now() - startTime) / 1000).toFixed(2);
     logger.timing('ENABLE_TRACKING', elapsedSeconds, `${inventoryItems.length} items`);
-    
+
     return { results, elapsedSeconds };
   }
 
@@ -140,7 +140,7 @@ class InventoryService {
           }
         }
       `;
-      
+
       const variables = {
         input: {
           reason: "correction",
@@ -165,9 +165,9 @@ class InventoryService {
 
     const results = await Promise.all(qtyPromises);
     const elapsedSeconds = ((Date.now() - startTime) / 1000).toFixed(2);
-    
+
     logger.timing('UPDATE_ONHAND', elapsedSeconds, `${allSetQuantities.length} items`);
-    
+
     return {
       results,
       elapsedSeconds,
@@ -195,7 +195,7 @@ class InventoryService {
           }
         }
       `;
-      
+
       const variables = {
         input: {
           reason: "correction",
@@ -221,9 +221,9 @@ class InventoryService {
     // Wait for all batches to complete in parallel
     const results = await Promise.all(qtyPromises);
     const elapsedSeconds = ((Date.now() - startTime) / 1000).toFixed(2);
-    
+
     logger.timing('SET_AVAILABLE', elapsedSeconds, `${quantities.length} items`);
-    
+
     return {
       results,
       elapsedSeconds,
@@ -245,30 +245,32 @@ class InventoryService {
   /**
    * Full inventory update (enable tracking + update quantities)
    */
-  async fullInventoryUpdate(shopifyService) {
+  async fullInventoryUpdate(shopifyService, options = {}) {
     logger.info('Starting full inventory update');
-    
+    const { shop, locationId: selectedLocationId } = options;
+
     let products;
-    if (cache.exists()) {
-      products = cache.load();
+    if (cache.exists(shop)) {
+      products = cache.load(shop);
     } else {
       products = await shopifyService.fetchAllProducts();
-      cache.save(products);
+      cache.save(products, shop);
     }
 
-    const locationId = await shopifyService.getFirstLocationId();
-    
+    const locationId = await shopifyService.getLocationId(selectedLocationId);
+
     // Enable tracking first
     const trackingResult = await this.enableTracking(products, shopifyService);
-    
+
     // Then update quantities
     const quantityResult = await this.updateOnHandQuantities(products, locationId, shopifyService);
-    
+
     return {
+      locationId,
       tracking: trackingResult,
       quantities: quantityResult
     };
   }
 }
 
-module.exports = new InventoryService(); 
+module.exports = new InventoryService();

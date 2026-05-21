@@ -3,22 +3,30 @@ import {
   Page,
   Card,
   Button,
-  TextContainer,
   Banner,
   Layout,
   Text,
   Spinner,
   InlineStack,
   BlockStack,
-  Tabs
+  Tabs,
+  Select
 } from '@shopify/polaris';
 import Settings from './components/Settings';
 import { SettingsProvider, useSettings } from './context/SettingsContext';
 
 // API Service Creator
-const createApiService = (settings) => {
+const createApiService = (settings, selectedLocationId = '') => {
   const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:4000";
-  
+  const shopifyHeaders = {
+    "X-Shopify-Access-Token": settings.apiKey,
+    "X-Shopify-Store-URL": settings.storeUrl
+  };
+  const inventoryHeaders = {
+    ...shopifyHeaders,
+    ...(selectedLocationId ? { "X-Shopify-Location-Id": selectedLocationId } : {})
+  };
+
   // Only proceed with API calls if we have both settings
   if (!settings.apiKey || !settings.storeUrl) {
     console.warn('Missing API key or store URL. Please configure settings first.');
@@ -27,129 +35,111 @@ const createApiService = (settings) => {
   return {
     // Product endpoints
     products: {
-      create: () => fetch(`${baseUrl}/products/create`, { 
-        method: "POST", 
+      create: () => fetch(`${baseUrl}/products/create`, {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Shopify-Access-Token": settings.apiKey,
-          "X-Shopify-Store-URL": settings.storeUrl
+          ...shopifyHeaders
         }
       }),
-      createMore: () => fetch(`${baseUrl}/products/create-more`, { 
-        method: "POST", 
+      createMore: () => fetch(`${baseUrl}/products/create-more`, {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Shopify-Access-Token": settings.apiKey,
-          "X-Shopify-Store-URL": settings.storeUrl
+          ...shopifyHeaders
         }
       }),
-      createFive: () => fetch(`${baseUrl}/products/create-five`, { 
-        method: "POST", 
+      createFive: () => fetch(`${baseUrl}/products/create-five`, {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Shopify-Access-Token": settings.apiKey,
-          "X-Shopify-Store-URL": settings.storeUrl
+          ...shopifyHeaders
         }
       }),
-      createMultiple: (count) => fetch(`${baseUrl}/products/create-multiple?count=${count}`, { 
-        method: "POST", 
+      createMultiple: (count) => fetch(`${baseUrl}/products/create-multiple?count=${count}`, {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Shopify-Access-Token": settings.apiKey,
-          "X-Shopify-Store-URL": settings.storeUrl
+          ...shopifyHeaders
         }
       }),
-      deleteDummy: () => fetch(`${baseUrl}/products/delete-dummy`, { 
-        method: "DELETE", 
+      deleteDummy: () => fetch(`${baseUrl}/products/delete-dummy`, {
+        method: "DELETE",
         headers: {
           "Content-Type": "application/json",
-          "X-Shopify-Access-Token": settings.apiKey,
-          "X-Shopify-Store-URL": settings.storeUrl
+          ...shopifyHeaders
         }
       }),
-      getBulkStatus: () => fetch(`${baseUrl}/products/bulk-operation-status`, { 
+      getBulkStatus: () => fetch(`${baseUrl}/products/bulk-operation-status`, {
         headers: {
-          "X-Shopify-Access-Token": settings.apiKey,
-          "X-Shopify-Store-URL": settings.storeUrl
+          ...shopifyHeaders
         }
       }),
-      getShopInfo: () => fetch(`${baseUrl}/products/shop-info`, { 
+      getShopInfo: () => fetch(`${baseUrl}/products/shop-info`, {
         headers: {
-          "X-Shopify-Access-Token": settings.apiKey,
-          "X-Shopify-Store-URL": settings.storeUrl
+          ...shopifyHeaders
         }
       }),
     },
-    
+
     // Inventory endpoints
     inventory: {
-      refreshCache: () => fetch(`${baseUrl}/inventory/refresh-cache`, { 
-        method: "POST",
-        headers: {
-          "X-Shopify-Access-Token": settings.apiKey,
-          "X-Shopify-Store-URL": settings.storeUrl
-        }
+      getLocations: () => fetch(`${baseUrl}/inventory/locations`, {
+        headers: shopifyHeaders
       }),
-      enableTracking: () => fetch(`${baseUrl}/inventory/enable-tracking`, { 
-        method: "POST",
-        headers: {
-          "X-Shopify-Access-Token": settings.apiKey,
-          "X-Shopify-Store-URL": settings.storeUrl
-        }
+      getCacheStatus: () => fetch(`${baseUrl}/inventory/cache-status`, {
+        headers: shopifyHeaders
       }),
-      updateQuantities: () => fetch(`${baseUrl}/inventory/update-quantities`, { 
-        method: "POST",
-        headers: {
-          "X-Shopify-Access-Token": settings.apiKey,
-          "X-Shopify-Store-URL": settings.storeUrl
-        }
+      clearCache: () => fetch(`${baseUrl}/inventory/cache`, {
+        method: "DELETE",
+        headers: shopifyHeaders
       }),
-      setAvailableQuantities: () => fetch(`${baseUrl}/inventory/set-available-quantities`, { 
+      refreshCache: () => fetch(`${baseUrl}/inventory/refresh-cache`, {
         method: "POST",
-        headers: {
-          "X-Shopify-Access-Token": settings.apiKey,
-          "X-Shopify-Store-URL": settings.storeUrl
-        }
+        headers: inventoryHeaders
       }),
-      updateFromCSV: () => fetch(`${baseUrl}/inventory/update-from-csv`, { 
+      enableTracking: () => fetch(`${baseUrl}/inventory/enable-tracking`, {
         method: "POST",
-        headers: {
-          "X-Shopify-Access-Token": settings.apiKey,
-          "X-Shopify-Store-URL": settings.storeUrl
-        }
+        headers: inventoryHeaders
       }),
-      fullUpdate: () => fetch(`${baseUrl}/inventory/update`, { 
+      updateQuantities: () => fetch(`${baseUrl}/inventory/update-quantities`, {
         method: "POST",
-        headers: {
-          "X-Shopify-Access-Token": settings.apiKey,
-          "X-Shopify-Store-URL": settings.storeUrl
-        }
+        headers: inventoryHeaders
+      }),
+      setAvailableQuantities: () => fetch(`${baseUrl}/inventory/set-available-quantities`, {
+        method: "POST",
+        headers: inventoryHeaders
+      }),
+      updateFromCSV: () => fetch(`${baseUrl}/inventory/update-from-csv`, {
+        method: "POST",
+        headers: inventoryHeaders
+      }),
+      fullUpdate: () => fetch(`${baseUrl}/inventory/update`, {
+        method: "POST",
+        headers: inventoryHeaders
       }),
     },
-    
+
     // Price endpoints
     prices: {
-      update: () => fetch(`${baseUrl}/prices/update`, { 
+      update: () => fetch(`${baseUrl}/prices/update`, {
         method: "POST",
         headers: {
-          "X-Shopify-Access-Token": settings.apiKey,
-          "X-Shopify-Store-URL": settings.storeUrl
+          ...shopifyHeaders
         }
       }),
-      updateBulk: () => fetch(`${baseUrl}/prices/update-bulk`, { 
+      updateBulk: () => fetch(`${baseUrl}/prices/update-bulk`, {
         method: "POST",
         headers: {
-          "X-Shopify-Access-Token": settings.apiKey,
-          "X-Shopify-Store-URL": settings.storeUrl
+          ...shopifyHeaders
         }
       }),
     },
-    
+
     // Health check
-    health: () => fetch(`${baseUrl}/health`, { 
+    health: () => fetch(`${baseUrl}/health`, {
       headers: {
-        "X-Shopify-Access-Token": settings.apiKey,
-        "X-Shopify-Store-URL": settings.storeUrl
+        ...shopifyHeaders
       }
     }),
   };
@@ -158,7 +148,8 @@ const createApiService = (settings) => {
 const AppContent = () => {
   const { settings } = useSettings();
   const [selectedTab, setSelectedTab] = useState(0);
-  const apiService = useMemo(() => createApiService(settings), [settings]);
+  const [selectedLocationId, setSelectedLocationId] = useState('');
+  const apiService = useMemo(() => createApiService(settings, selectedLocationId), [settings, selectedLocationId]);
 
   const tabs = [
     {
@@ -191,6 +182,10 @@ const AppContent = () => {
 
   // Inventory state
   const [cacheStatus, setCacheStatus] = useState("");
+  const [cacheInfo, setCacheInfo] = useState(null);
+  const [locations, setLocations] = useState([]);
+  const [locationsStatus, setLocationsStatus] = useState("");
+  const [locationsLoading, setLocationsLoading] = useState(false);
   const [enableTrackingStatus, setEnableTrackingStatus] = useState("");
   const [inventoryQtyStatus, setInventoryQtyStatus] = useState("");
   const [updatedQtyCount, setUpdatedQtyCount] = useState(null);
@@ -219,7 +214,7 @@ const AppContent = () => {
       setStatus("Loading...");
       const response = await apiCall();
       const data = await response.json();
-      
+
       if (data.success !== false) {
         setStatus(successMessage || data.message || "Success!");
         if (setResult) setResult(data);
@@ -234,6 +229,73 @@ const AppContent = () => {
       setStatus(`Error: ${error.message}`);
       if (setResult) setResult({ error: error.message });
       return null;
+    }
+  };
+
+  const formatCacheMessage = (cache) => {
+    if (!cache?.exists) return "No cache for this store. Refresh cache before inventory or price actions.";
+
+    const count = cache.count !== null ? cache.count.toLocaleString() : "unknown";
+    const age = cache.ageMinutes !== null ? `${cache.ageMinutes} min old` : "unknown age";
+    return `Cache ready: ${count} products (${age})`;
+  };
+
+  const handleFetchLocations = async () => {
+    if (!settings.apiKey || !settings.storeUrl) return;
+
+    setLocationsLoading(true);
+    try {
+      const response = await apiService.inventory.getLocations();
+      const data = await response.json();
+
+      if (data.success && data.locations?.length) {
+        setLocations(data.locations);
+        setSelectedLocationId(currentLocationId => {
+          const stillExists = data.locations.some(location => location.id === currentLocationId);
+          return stillExists ? currentLocationId : data.locations[0].id;
+        });
+        setLocationsStatus(`${data.locations.length} location${data.locations.length === 1 ? '' : 's'} available`);
+      } else {
+        setLocations([]);
+        setSelectedLocationId('');
+        setLocationsStatus(`Error: ${data.error || 'No locations returned'}`);
+      }
+    } catch (error) {
+      setLocations([]);
+      setSelectedLocationId('');
+      setLocationsStatus(`Error: ${error.message}`);
+    }
+    setLocationsLoading(false);
+  };
+
+  const handleCacheStatus = async () => {
+    if (!settings.apiKey || !settings.storeUrl) return;
+
+    try {
+      const response = await apiService.inventory.getCacheStatus();
+      const data = await response.json();
+
+      if (data.success) {
+        setCacheInfo(data.cache);
+        setCacheStatus(formatCacheMessage(data.cache));
+      } else {
+        setCacheStatus(`Error: ${data.error || 'Unable to read cache status'}`);
+      }
+    } catch (error) {
+      setCacheStatus(`Error: ${error.message}`);
+    }
+  };
+
+  const handleClearCache = async () => {
+    const data = await handleApiCall(
+      apiService.inventory.clearCache,
+      setCacheStatus,
+      null,
+      "Cache cleared for this store"
+    );
+
+    if (data) {
+      setCacheInfo({ exists: false });
     }
   };
 
@@ -326,6 +388,7 @@ const AppContent = () => {
     );
     if (data?.count) {
       setCacheStatus(`Cache refreshed: ${data.count} products`);
+      if (data.cache) setCacheInfo(data.cache);
     }
   };
 
@@ -383,8 +446,9 @@ const AppContent = () => {
       setFullUpdateStatus
     );
     if (data) {
-      const totalElapsed = (parseFloat(data.enableTracking?.elapsedSeconds || 0) + 
-                           parseFloat(data.updateQuantities?.elapsedSeconds || 0)).toFixed(2);
+      const trackingElapsed = data.tracking?.elapsedSeconds || data.enableTracking?.elapsedSeconds || 0;
+      const quantityElapsed = data.quantities?.elapsedSeconds || data.updateQuantities?.elapsedSeconds || 0;
+      const totalElapsed = (parseFloat(trackingElapsed) + parseFloat(quantityElapsed)).toFixed(2);
       setFullUpdateElapsed(totalElapsed);
       setFullUpdateStatus(`Full update completed in ${totalElapsed}s`);
     }
@@ -448,55 +512,119 @@ const AppContent = () => {
     handleHealthCheck();
     if (settings.apiKey && settings.storeUrl) {
       handleFetchShopInfo();
+      handleFetchLocations();
+      handleCacheStatus();
+    } else {
+      setShopInfo(null);
+      setLocations([]);
+      setSelectedLocationId('');
+      setCacheInfo(null);
+      setCacheStatus('');
     }
   }, [settings]);
 
-  // Calculate theoretical performance tables
-  const theoreticalTable = useMemo(() => {
-    if (!updatedQtyCount || !inventoryQtyStatus || !inventoryQtyStatus.includes('Done in')) return null;
-    const match = inventoryQtyStatus.match(/Done in ([\d.]+)s/);
+  const buildPerformanceAnalytics = (label, itemCount, status) => {
+    if (!itemCount || !status || !status.includes('Done in')) return null;
+
+    const match = status.match(/Done in ([\d.]+)s/);
     if (!match) return null;
+
     const seconds = parseFloat(match[1]);
-    const items = updatedQtyCount;
-    if (!items || !seconds) return null;
-    const perItem = seconds / items;
-    const calc = (n) => (perItem * n);
+    if (!seconds) return null;
+
+    const batchSize = 250;
+    const batchCount = Math.ceil(itemCount / batchSize);
+    const throughput = itemCount / seconds;
+    const isProjectionReliable = itemCount >= 1000 && batchCount >= 4;
+
     const formatMinSec = (s) => {
       const min = Math.floor(s / 60);
       const sec = Math.round(s % 60);
       return `${min}m ${sec.toString().padStart(2, '0')}s`;
     };
-    return [
-      { label: '1,000,000', time: calc(1_000_000).toFixed(2), minsec: formatMinSec(calc(1_000_000)) },
-      { label: '2,000,000', time: calc(2_000_000).toFixed(2), minsec: formatMinSec(calc(2_000_000)) },
-      { label: '3,000,000', time: calc(3_000_000).toFixed(2), minsec: formatMinSec(calc(3_000_000)) },
-    ];
+
+    const projectionRows = isProjectionReliable
+      ? [1_000_000, 2_000_000, 3_000_000].map(items => {
+          const estimate = items / throughput;
+          return {
+            label: items.toLocaleString(),
+            seconds: estimate.toFixed(2),
+            minsec: formatMinSec(estimate)
+          };
+        })
+      : [];
+
+    return {
+      label,
+      itemCount,
+      seconds,
+      batchCount,
+      throughput,
+      isProjectionReliable,
+      projectionRows
+    };
+  };
+
+  const quantityPerformance = useMemo(() => {
+    return buildPerformanceAnalytics('Update Inventory Quantities', updatedQtyCount, inventoryQtyStatus);
   }, [updatedQtyCount, inventoryQtyStatus]);
 
-  const availableQtyTheoreticalTable = useMemo(() => {
-    if (!availableQtyCount || !availableQtyStatus || !availableQtyStatus.includes('Done in')) return null;
-    const match = availableQtyStatus.match(/Done in ([\d.]+)s/);
-    if (!match) return null;
-    const seconds = parseFloat(match[1]);
-    const items = availableQtyCount;
-    if (!items || !seconds) return null;
-    const perItem = seconds / items;
-    const calc = (n) => (perItem * n);
-    const formatMinSec = (s) => {
-      const min = Math.floor(s / 60);
-      const sec = Math.round(s % 60);
-      return `${min}m ${sec.toString().padStart(2, '0')}s`;
-    };
-    return [
-      { label: '1,000,000', time: calc(1_000_000).toFixed(2), minsec: formatMinSec(calc(1_000_000)) },
-      { label: '2,000,000', time: calc(2_000_000).toFixed(2), minsec: formatMinSec(calc(2_000_000)) },
-      { label: '3,000,000', time: calc(3_000_000).toFixed(2), minsec: formatMinSec(calc(3_000_000)) },
-    ];
+  const availableQuantityPerformance = useMemo(() => {
+    return buildPerformanceAnalytics('Set Available Quantities', availableQtyCount, availableQtyStatus);
   }, [availableQtyCount, availableQtyStatus]);
 
   const handleTabChange = (selectedTabIndex) => {
     setSelectedTab(selectedTabIndex);
   };
+
+  const locationOptions = locations.map(location => ({
+    label: location.name,
+    value: location.id
+  }));
+
+  const selectedLocation = locations.find(location => location.id === selectedLocationId);
+  const performanceAnalytics = [quantityPerformance, availableQuantityPerformance].filter(Boolean);
+
+  const renderPerformanceAnalytics = (analytics) => (
+    <div key={analytics.label}>
+      <Text variant="headingSm" as="h3">{analytics.label}</Text>
+      <div style={{ background: '#f9f9f9', padding: 16, marginTop: 12, borderRadius: 8 }}>
+        <BlockStack gap="200">
+          <Text variant="bodyMd" as="p">
+            Observed: {analytics.itemCount.toLocaleString()} items in {analytics.seconds.toFixed(2)}s across {analytics.batchCount.toLocaleString()} Shopify batch{analytics.batchCount === 1 ? '' : 'es'}.
+          </Text>
+          <Text variant="bodyMd" as="p">
+            Throughput: {Math.round(analytics.throughput).toLocaleString()} items/sec for this run.
+          </Text>
+
+          {!analytics.isProjectionReliable ? (
+            <Banner status="info">
+              <p>Large-volume projection is hidden because this sample is too small. Run at least 1,000 items, or 4 Shopify batches, for a more useful estimate.</p>
+            </Banner>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left', padding: 8, borderBottom: '2px solid #ddd', fontWeight: 600 }}>Items</th>
+                  <th style={{ textAlign: 'left', padding: 8, borderBottom: '2px solid #ddd', fontWeight: 600 }}>Estimated Time (seconds)</th>
+                  <th style={{ textAlign: 'left', padding: 8, borderBottom: '2px solid #ddd', fontWeight: 600 }}>Estimated Time (min:sec)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analytics.projectionRows.map(row => (
+                  <tr key={row.label}>
+                    <td style={{ padding: 8, borderBottom: '1px solid #eee' }}>{row.label}</td>
+                    <td style={{ padding: 8, borderBottom: '1px solid #eee' }}>{row.seconds}</td>
+                    <td style={{ padding: 8, borderBottom: '1px solid #eee' }}>{row.minsec}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </BlockStack>
+      </div>
+    </div>
+  );
 
   return (
     <Page>
@@ -512,9 +640,10 @@ const AppContent = () => {
                   <InlineStack gap="400">
                     <Button onClick={handleHealthCheck} tone="success" size="slim">Check Backend Health</Button>
                     <Button onClick={handleFetchShopInfo} size="slim" loading={shopInfoLoading}>Refresh Shop Info</Button>
+                    <Button onClick={handleFetchLocations} size="slim" loading={locationsLoading}>Get Locations</Button>
                   </InlineStack>
                   {healthStatus && <Text variant="bodyMd" as="span">{healthStatus}</Text>}
-                  
+
                   {shopInfo && !shopInfo.error && (
                     <BlockStack gap="200">
                       <Text variant="headingSm" as="h3">🏪 Connected Store</Text>
@@ -536,12 +665,31 @@ const AppContent = () => {
                       </BlockStack>
                     </BlockStack>
                   )}
-                  
+
                   {shopInfo && shopInfo.error && (
                     <Banner status="critical">
                       <p>Failed to fetch shop info: {shopInfo.error}</p>
                     </Banner>
                   )}
+
+                  {locationOptions.length > 0 && (
+                    <BlockStack gap="200">
+                      <Text variant="headingSm" as="h3">Inventory Location</Text>
+                      <div style={{ maxWidth: 420 }}>
+                        <Select
+                          label="Location used for inventory quantity updates"
+                          options={locationOptions}
+                          value={selectedLocationId}
+                          onChange={setSelectedLocationId}
+                        />
+                      </div>
+                      {selectedLocation && (
+                        <Text variant="bodyMd" as="span">Selected: {selectedLocation.name}</Text>
+                      )}
+                    </BlockStack>
+                  )}
+
+                  {locationsStatus && <Text variant="bodyMd" as="span">{locationsStatus}</Text>}
                 </BlockStack>
               </Card>
 
@@ -557,14 +705,14 @@ const AppContent = () => {
                     <Button onClick={handleDeleteDummyProducts} tone="critical">Delete All Dummy Products</Button>
                     <Button onClick={handleCheckBulkStatus}>Check Bulk Operation Status</Button>
                   </InlineStack>
-                  
+
                   <BlockStack gap="200">
                     {productStatus && <Text variant="bodyMd" as="span">{productStatus}</Text>}
                     {moreProductsStatus && <Text variant="bodyMd" as="span">{moreProductsStatus}</Text>}
                     {fiveProductsStatus && <Text variant="bodyMd" as="span">{fiveProductsStatus}</Text>}
                     {multipleProductsStatus && <Text variant="bodyMd" as="span">⚡ {multipleProductsStatus}</Text>}
                     {deleteDummyStatus && <Text variant="bodyMd" as="span">🗑️ {deleteDummyStatus}</Text>}
-                    
+
                     {productResult && (
                       <Banner status="info" title="Product Creation Result">
                         <pre style={{ background: "#eef", padding: 10, marginTop: 10, maxHeight: 200, overflow: 'auto' }}>
@@ -572,7 +720,7 @@ const AppContent = () => {
                         </pre>
                       </Banner>
                     )}
-                    
+
                     {moreProductsResult && (
                       <Banner status="info" title="Additional Products Result">
                         <pre style={{ background: "#eef", padding: 10, marginTop: 10, maxHeight: 200, overflow: 'auto' }}>
@@ -580,7 +728,7 @@ const AppContent = () => {
                         </pre>
                       </Banner>
                     )}
-                    
+
                     {fiveProductsResult && (
                       <Banner status="info" title="Five Dummy Products Result">
                         <pre style={{ background: "#eef", padding: 10, marginTop: 10, maxHeight: 200, overflow: 'auto' }}>
@@ -588,7 +736,7 @@ const AppContent = () => {
                         </pre>
                       </Banner>
                     )}
-                    
+
                     {multipleProductsResult && (
                       <Banner status="info" title="Multiple Products Creation Result">
                         <pre style={{ background: "#eef", padding: 10, marginTop: 10, maxHeight: 200, overflow: 'auto' }}>
@@ -596,7 +744,7 @@ const AppContent = () => {
                         </pre>
                       </Banner>
                     )}
-                    
+
                     {deleteDummyResult && (
                       <Banner status="success" title="Delete Dummy Products Result">
                         <pre style={{ background: "#efe", padding: 10, marginTop: 10, maxHeight: 200, overflow: 'auto' }}>
@@ -613,16 +761,21 @@ const AppContent = () => {
                 <BlockStack gap="400">
                   <Text variant="headingMd" as="h2">📊 Inventory Management</Text>
                   <InlineStack gap="400" wrap>
+                    <Button onClick={handleCacheStatus}>Check Cache</Button>
                     <Button onClick={handleRefreshCache}>Refresh Cache</Button>
+                    <Button onClick={handleClearCache}>Clear Cache</Button>
                     <Button onClick={handleFullInventoryUpdate} tone="critical">Full Inventory Update</Button>
                     <Button onClick={handleEnableTracking}>Enable Tracking (Step 1)</Button>
                     <Button onClick={handleUpdateInventoryQty}>Update Quantities (Step 2)</Button>
                     <Button onClick={handleSetAvailableQuantities}>Set Available Quantities</Button>
                     <Button onClick={handleUpdateFromCSV}>Update from CSV</Button>
                   </InlineStack>
-                  
+
                   <BlockStack gap="200">
                     {cacheStatus && <Text variant="bodyMd" as="span">🗂️ {cacheStatus}</Text>}
+                    {cacheInfo?.exists && cacheInfo?.shop && (
+                      <Text variant="bodyMd" as="span">Store cache: {cacheInfo.shop}</Text>
+                    )}
                     {fullUpdateStatus && (
                       <Text variant="bodyMd" as="span" tone="success">
                         🚀 {fullUpdateStatus}
@@ -650,7 +803,7 @@ const AppContent = () => {
                       </Text>
                     )}
                     {csvStatus && <Text variant="bodyMd" as="span">📄 {csvStatus}</Text>}
-                    
+
                     {csvResult && (
                       <Banner status="info" title="CSV Update Result">
                         <pre style={{ background: "#eef", padding: 10, marginTop: 10, maxHeight: 200, overflow: 'auto' }}>
@@ -670,11 +823,11 @@ const AppContent = () => {
                     <Button onClick={handleUpdatePrices}>Update Prices (Individual)</Button>
                     <Button onClick={handleUpdatePricesBulk} primary>Update Prices (Bulk - Faster)</Button>
                   </InlineStack>
-                  
+
                   <BlockStack gap="200">
                     {priceStatus && <Text variant="bodyMd" as="span">💵 {priceStatus}</Text>}
                     {bulkPriceStatus && <Text variant="bodyMd" as="span">⚡ {bulkPriceStatus}</Text>}
-                    
+
                     {priceResult && (
                       <Banner status="info" title="Price Update Result">
                         <pre style={{ background: "#eef", padding: 10, marginTop: 10, maxHeight: 200, overflow: 'auto' }}>
@@ -682,7 +835,7 @@ const AppContent = () => {
                         </pre>
                       </Banner>
                     )}
-                    
+
                     {bulkPriceResult && (
                       <Banner status="info" title="Bulk Price Update Result">
                         <pre style={{ background: "#eef", padding: 10, marginTop: 10, maxHeight: 200, overflow: 'auto' }}>
@@ -710,62 +863,11 @@ const AppContent = () => {
               </Card>
 
               {/* Performance Analytics */}
-              {(theoreticalTable || availableQtyTheoreticalTable) && (
+              {performanceAnalytics.length > 0 && (
                 <Card>
                   <BlockStack gap="400">
                     <Text variant="headingMd" as="h2">📊 Performance Analytics</Text>
-                    
-                    {theoreticalTable && (
-                      <div>
-                        <Text variant="headingSm" as="h3">Theoretical Time to Update Inventory Quantities</Text>
-                        <div style={{ background: '#f9f9f9', padding: 16, marginTop: 12, borderRadius: 8 }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                              <tr>
-                                <th style={{ textAlign: 'left', padding: 8, borderBottom: '2px solid #ddd', fontWeight: 600 }}>Items</th>
-                                <th style={{ textAlign: 'left', padding: 8, borderBottom: '2px solid #ddd', fontWeight: 600 }}>Estimated Time (seconds)</th>
-                                <th style={{ textAlign: 'left', padding: 8, borderBottom: '2px solid #ddd', fontWeight: 600 }}>Estimated Time (min:sec)</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {theoreticalTable.map(row => (
-                                <tr key={row.label}>
-                                  <td style={{ padding: 8, borderBottom: '1px solid #eee' }}>{row.label}</td>
-                                  <td style={{ padding: 8, borderBottom: '1px solid #eee' }}>{row.time}</td>
-                                  <td style={{ padding: 8, borderBottom: '1px solid #eee' }}>{row.minsec}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {availableQtyTheoreticalTable && (
-                      <div>
-                        <Text variant="headingSm" as="h3">Theoretical Time to Set Available Quantities</Text>
-                        <div style={{ background: '#f9f9f9', padding: 16, marginTop: 12, borderRadius: 8 }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                              <tr>
-                                <th style={{ textAlign: 'left', padding: 8, borderBottom: '2px solid #ddd', fontWeight: 600 }}>Items</th>
-                                <th style={{ textAlign: 'left', padding: 8, borderBottom: '2px solid #ddd', fontWeight: 600 }}>Estimated Time (seconds)</th>
-                                <th style={{ textAlign: 'left', padding: 8, borderBottom: '2px solid #ddd', fontWeight: 600 }}>Estimated Time (min:sec)</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {availableQtyTheoreticalTable.map(row => (
-                                <tr key={row.label}>
-                                  <td style={{ padding: 8, borderBottom: '1px solid #eee' }}>{row.label}</td>
-                                  <td style={{ padding: 8, borderBottom: '1px solid #eee' }}>{row.time}</td>
-                                  <td style={{ padding: 8, borderBottom: '1px solid #eee' }}>{row.minsec}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
+                    {performanceAnalytics.map(renderPerformanceAnalytics)}
                   </BlockStack>
                 </Card>
               )}
@@ -787,4 +889,4 @@ function App() {
   );
 }
 
-export default App; 
+export default App;

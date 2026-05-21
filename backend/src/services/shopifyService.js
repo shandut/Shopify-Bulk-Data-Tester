@@ -18,7 +18,7 @@ class ShopifyService {
       }
 
       const response = await axios.post(this.graphqlUrl, payload, { headers: this.headers });
-      
+
       // Log throttle status if available
       if (response.data.extensions?.cost?.throttleStatus) {
         const throttle = response.data.extensions.cost.throttleStatus;
@@ -46,11 +46,11 @@ class ShopifyService {
   }
 
   /**
-   * Get first location ID
+   * Get store locations
    */
-  async getFirstLocationId() {
+  async getLocations() {
     const query = `{
-      locations(first: 1) {
+      locations(first: 50) {
         edges {
           node {
             id
@@ -61,13 +61,42 @@ class ShopifyService {
     }`;
 
     const response = await this.graphql(query);
-    if (!response.data?.locations?.edges?.length) {
+    const locations = response.data?.locations?.edges?.map(edge => edge.node) || [];
+
+    if (!locations.length) {
       throw new Error('No locations found');
     }
 
-    const location = response.data.locations.edges[0].node;
-    logger.info(`Using location: ${location.name} (${location.id})`);
+    logger.info(`Fetched ${locations.length} locations`);
+    return locations;
+  }
+
+  /**
+   * Get requested location ID, or default to the store's first location
+   */
+  async getLocationId(preferredLocationId = null) {
+    const locations = await this.getLocations();
+
+    if (preferredLocationId) {
+      const location = locations.find(({ id }) => id === preferredLocationId);
+      if (!location) {
+        throw new Error(`Selected location was not found for this store: ${preferredLocationId}`);
+      }
+
+      logger.info(`Using selected location: ${location.name} (${location.id})`);
+      return location.id;
+    }
+
+    const location = locations[0];
+    logger.info(`Using default location: ${location.name} (${location.id})`);
     return location.id;
+  }
+
+  /**
+   * Get first location ID
+   */
+  async getFirstLocationId() {
+    return this.getLocationId();
   }
 
   /**
@@ -105,14 +134,14 @@ class ShopifyService {
 
       const response = await this.graphql(query);
       const data = response.data.products;
-      
+
       products = products.concat(data.edges.map(e => e.node));
       hasNextPage = data.pageInfo.hasNextPage;
-      
+
       if (hasNextPage) {
         endCursor = data.edges[data.edges.length - 1].cursor;
       }
-      
+
       logger.info(`Fetched page with ${data.edges.length} products, total so far: ${products.length}`);
     }
 
@@ -171,7 +200,7 @@ class ShopifyService {
     };
 
     const response = await this.graphql(mutation, variables);
-    
+
     if (response.data.stagedUploadsCreate.userErrors?.length > 0) {
       throw new Error(`Staged upload error: ${JSON.stringify(response.data.stagedUploadsCreate.userErrors)}`);
     }
@@ -196,7 +225,7 @@ class ShopifyService {
     `;
 
     const response = await this.graphql(bulkMutation);
-    
+
     if (response.data.bulkOperationRunMutation.userErrors?.length > 0) {
       throw new Error(`Bulk operation error: ${JSON.stringify(response.data.bulkOperationRunMutation.userErrors)}`);
     }
@@ -248,7 +277,7 @@ class ShopifyService {
     `;
 
     const response = await this.graphql(query);
-    
+
     if (response.errors) {
       throw new Error(`Failed to fetch shop info: ${JSON.stringify(response.errors)}`);
     }
@@ -257,4 +286,4 @@ class ShopifyService {
   }
 }
 
-module.exports = ShopifyService; 
+module.exports = ShopifyService;

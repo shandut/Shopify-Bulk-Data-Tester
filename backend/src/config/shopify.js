@@ -11,6 +11,7 @@ const config = {
   },
   cache: {
     inventoryCacheFile: 'inventory_cache.json',
+    inventoryCacheDir: '.cache',
     maxAgeMs: 60 * 60 * 1000 // 1 hour
   }
 };
@@ -22,4 +23,4 @@ config.shopify.headers = {
   "X-Shopify-Access-Token": config.shopify.accessToken
 };
 
-module.exports = config; 
+module.exports = config;

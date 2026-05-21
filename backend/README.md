@@ -1,6 +1,6 @@
-# Shopify Product Creator - Professional Backend
+# Shopify Bulk Data Testing Backend
 
-A high-performance, enterprise-grade Node.js backend for managing large-scale Shopify product and inventory operations.
+A Node.js backend for testing high-volume Shopify Admin API workflows across product creation/deletion, inventory updates, cache refreshes, location handling, pricing, and OAuth app install flows.
 
 ## 🏗️ Architecture
 
@@ -38,7 +38,8 @@ backend/
 - **Real-time Status**: Monitor bulk operation progress
 
 ### Inventory Management
-- **Cache System**: Intelligent caching with expiration for performance
+- **Cache System**: Store-specific caching with expiration for performance
+- **Location Discovery**: Fetch and use locations from the connected store
 - **Tracking Enablement**: Bulk enable inventory tracking with throttle management
 - **Quantity Updates**: High-performance parallel quantity updates
 - **CSV Import**: Update inventory from CSV files
@@ -92,6 +93,9 @@ NODE_ENV=development
 
 ### Inventory Management
 - `POST /inventory/refresh-cache` - Refresh product cache
+- `GET /inventory/cache-status` - Check product cache for the connected store
+- `DELETE /inventory/cache` - Clear product cache for the connected store
+- `GET /inventory/locations` - Get inventory locations for the connected store
 - `POST /inventory/enable-tracking` - Enable inventory tracking
 - `POST /inventory/update-quantities` - Update on-hand quantities
 - `POST /inventory/set-available-quantities` - Set available quantities
@@ -109,6 +113,10 @@ NODE_ENV=development
 
 ### System
 - `GET /health` - Health check endpoint
+- `GET /api/oauth/config` - Get Shopify app install configuration
+- `POST /api/oauth/config` - Save Shopify app client credentials/scopes
+- `GET /api/oauth/install?shop=your-shop.myshopify.com` - Start Shopify OAuth install
+- `GET /api/oauth/callback` - Shopify OAuth callback; verifies HMAC/state and saves the access token
 
 ## 🏃‍♂️ Quick Start
 
@@ -117,20 +125,38 @@ NODE_ENV=development
    curl -X POST http://localhost:4000/inventory/refresh-cache
    ```
 
-2. **Create Products**:
+2. **Get Locations**:
+   ```bash
+   curl http://localhost:4000/inventory/locations
+   ```
+
+3. **Create Products**:
    ```bash
    curl -X POST http://localhost:4000/products/create
    ```
 
-3. **Update Inventory**:
+4. **Update Inventory**:
    ```bash
    curl -X POST http://localhost:4000/inventory/update
    ```
 
-4. **Update Prices**:
+5. **Update Prices**:
    ```bash
    curl -X POST http://localhost:4000/prices/update-bulk
    ```
+
+When a location is selected in the frontend, it is sent as `X-Shopify-Location-Id`. If that header is omitted, the backend uses the first location returned by Shopify. Inventory caches are keyed by connected shop domain under `.cache/`, so switching stores does not reuse another store's product IDs.
+
+## Shopify App OAuth Setup
+
+Use this flow to install a dev app and let the backend obtain the Admin API access token:
+
+1. Expose the backend on a public HTTPS URL, for example a tunnel to `http://localhost:4000`.
+2. Add `https://your-public-backend-url/api/oauth/callback` to the Shopify app's allowed callback URLs.
+3. Save the app client ID, client secret, public backend URL, frontend redirect URL, and scopes from the Settings tab.
+4. Start installation from `/api/oauth/install?shop=your-shop.myshopify.com` or the Settings tab button.
+
+The callback route verifies the `state` value and Shopify HMAC before exchanging the authorization code for an Admin API access token. The resulting shop and token are written to `.env` for the existing request-header based API calls.
 
 ## 🔍 Monitoring
 
@@ -220,4 +246,4 @@ The new structure maintains **100% backward compatibility** with existing fronte
 
 ## 📄 License
 
-ISC License - see LICENSE file for details. 
+ISC License - see LICENSE file for details.

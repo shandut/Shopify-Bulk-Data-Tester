@@ -40,7 +40,8 @@ Thumbs.db
 *.swo
 
 # Generated files
+build/
 inventory_cache.json
 products.jsonl
 bulk_price_updates.jsonl
-inventory_update.csv 
+inventory_update.csv

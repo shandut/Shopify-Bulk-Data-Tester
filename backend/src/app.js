@@ -9,6 +9,7 @@ const inventoryRoutes = require('./routes/inventory');
 const productRoutes = require('./routes/products');
 const priceRoutes = require('./routes/prices');
 const settingsRoutes = require('./routes/settings');
+const oauthRoutes = require('./routes/oauth');
 
 // Create Express app
 const app = express();
@@ -20,9 +21,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Request logging middleware
 app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.path}`, { 
-    query: req.query, 
-    body: req.method !== 'GET' ? req.body : undefined 
+  logger.info(`${req.method} ${req.path}`, {
+    query: req.query,
+    body: req.method !== 'GET' ? req.body : undefined
   });
   next();
 });
@@ -34,6 +35,7 @@ app.get('/health', (req, res) => {
 
 // Settings routes (no auth required)
 app.use('/api/settings', settingsRoutes);
+app.use('/api/oauth', oauthRoutes);
 
 // Apply Shopify auth middleware to all other routes
 app.use(shopifyAuth);
@@ -60,4 +62,4 @@ app.use('/update-prices-bulk', priceRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-module.exports = app; 
+module.exports = app;

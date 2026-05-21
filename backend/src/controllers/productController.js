@@ -4,6 +4,7 @@ const FormData = require('form-data');
 const ShopifyService = require('../services/shopifyService');
 const cache = require('../utils/cache');
 const logger = require('../utils/logger');
+const getShop = (req) => req.shopifyConfig?.shop;
 
 // Track ongoing operations
 let isShuttingDown = false;
@@ -13,7 +14,7 @@ let activeOperations = new Set();
 process.on('SIGINT', async () => {
   logger.info('Received SIGINT (Ctrl+C). Cleaning up...');
   isShuttingDown = true;
-  
+
   // Wait for active operations to complete (with timeout)
   if (activeOperations.size > 0) {
     logger.info(`Waiting for ${activeOperations.size} operations to complete...`);
@@ -34,7 +35,7 @@ process.on('SIGINT', async () => {
       logger.warn('Some operations did not complete:', error.message);
     }
   }
-  
+
   process.exit(0);
 });
 
@@ -46,7 +47,7 @@ class ProductController {
     try {
       logger.info('Product creation requested');
       const shopifyService = new ShopifyService(req.shopifyConfig);
-      
+
       // Generate products.jsonl
       const lines = Array.from({ length: 30000 }, (_, i) => {
         const idx = i + 1;
@@ -59,7 +60,7 @@ class ProductController {
           }
         });
       });
-      
+
       fs.writeFileSync('products.jsonl', lines.join('\n'));
       logger.info('Generated products.jsonl with 30,000 products');
 
@@ -88,19 +89,20 @@ class ProductController {
       `;
 
       const bulkOperation = await shopifyService.startBulkOperation(productCreateMutation, key);
-      
+      cache.clear(getShop(req));
+
       logger.info(`Bulk product creation started: ${bulkOperation.id}`);
-      
-      res.json({ 
-        success: true, 
+
+      res.json({
+        success: true,
         result: bulkOperation,
         message: `Bulk operation started for 30,000 products! ID: ${bulkOperation.id}`
       });
     } catch (error) {
       logger.error('Product creation failed', error);
-      res.status(500).json({ 
-        success: false, 
-        error: error.message 
+      res.status(500).json({
+        success: false,
+        error: error.message
       });
     }
   }
@@ -112,13 +114,14 @@ class ProductController {
     try {
       logger.info('Create more products requested');
       const shopifyService = new ShopifyService(req.shopifyConfig);
-      
+
       // Determine highest Dummy Product number
       let products = [];
-      if (cache.exists()) {
-        products = cache.load();
+      if (cache.exists(getShop(req))) {
+        products = cache.load(getShop(req));
       } else {
         products = await shopifyService.fetchAllProducts();
+        cache.save(products, getShop(req));
       }
 
       // Find highest number
@@ -133,7 +136,7 @@ class ProductController {
 
       const startNum = maxNum + 1;
       const endNum = startNum + 30000 - 1;
-      
+
       logger.info(`Creating products from ${startNum} to ${endNum}`);
 
       // Generate new products.jsonl
@@ -148,7 +151,7 @@ class ProductController {
           }
         });
       });
-      
+
       fs.writeFileSync('products.jsonl', lines.join('\n'));
 
       // Create and upload
@@ -174,18 +177,19 @@ class ProductController {
       `;
 
       const bulkOperation = await shopifyService.startBulkOperation(productCreateMutation, key);
-      
-      res.json({ 
-        success: true, 
-        result: bulkOperation, 
+      cache.clear(getShop(req));
+
+      res.json({
+        success: true,
+        result: bulkOperation,
         range: { startNum, endNum },
         message: `Bulk operation started for Dummy Product ${startNum} to ${endNum}!`
       });
     } catch (error) {
       logger.error('Create more products failed', error);
-      res.status(500).json({ 
-        success: false, 
-        error: error.message 
+      res.status(500).json({
+        success: false,
+        error: error.message
       });
     }
   }
@@ -197,13 +201,14 @@ class ProductController {
     try {
       logger.info('Create 5 dummy products requested');
       const shopifyService = new ShopifyService(req.shopifyConfig);
-      
+
       // Determine highest Dummy Product number
       let products = [];
-      if (cache.exists()) {
-        products = cache.load();
+      if (cache.exists(getShop(req))) {
+        products = cache.load(getShop(req));
       } else {
         products = await shopifyService.fetchAllProducts();
+        cache.save(products, getShop(req));
       }
 
       // Find highest number
@@ -218,7 +223,7 @@ class ProductController {
 
       const startNum = maxNum + 1;
       const endNum = startNum + 4; // Create 5 products (startNum to startNum+4)
-      
+
       logger.info(`Creating 5 products from ${startNum} to ${endNum}`);
 
       const results = [];
@@ -227,7 +232,7 @@ class ProductController {
       // Create products one by one using individual GraphQL mutations
       for (let i = 0; i < 5; i++) {
         const productNum = startNum + i;
-        
+
         const mutation = `
           mutation {
             productCreate(input: {
@@ -254,7 +259,7 @@ class ProductController {
 
         try {
           const response = await shopifyService.graphql(mutation);
-          
+
           if (response.data?.productCreate?.userErrors?.length > 0) {
             const userErrors = response.data.productCreate.userErrors;
             logger.error(`Product ${productNum} creation errors:`, userErrors);
@@ -275,9 +280,13 @@ class ProductController {
         // Small delay between requests to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 100));
       }
-      
-      res.json({ 
-        success: true, 
+
+      if (results.length > 0) {
+        cache.clear(getShop(req));
+      }
+
+      res.json({
+        success: true,
         message: `Created ${results.length} out of 5 dummy products (${startNum} to ${endNum})`,
         results,
         errors,
@@ -290,9 +299,9 @@ class ProductController {
       });
     } catch (error) {
       logger.error('Create 5 dummy products failed', error);
-      res.status(500).json({ 
-        success: false, 
-        error: error.message 
+      res.status(500).json({
+        success: false,
+        error: error.message
       });
     }
   }
@@ -311,16 +320,16 @@ class ProductController {
         const count = parseInt(req.query.count || '5000');
         logger.info(`Creating ${count} products concurrently with rate limiting`);
         const shopifyService = new ShopifyService(req.shopifyConfig);
-        
+
         // Determine highest Dummy Product number by fetching all products
         logger.info('Fetching existing products to determine next product number...');
         let products = [];
         let highestProductNumber = 0;
 
         // First try to get from cache
-        if (cache.exists()) {
+        if (cache.exists(getShop(req))) {
           logger.info('Using cached products list');
-          products = cache.load();
+          products = cache.load(getShop(req));
         }
 
         // If cache is empty or products array is empty, fetch from API
@@ -329,7 +338,7 @@ class ProductController {
           products = await shopifyService.fetchAllProducts();
           // Update cache with new products
           if (products && products.length > 0) {
-            cache.save(products);
+            cache.save(products, getShop(req));
           }
         }
 
@@ -350,7 +359,7 @@ class ProductController {
         logger.info(`Highest existing product number found: ${highestProductNumber}`);
         const startNum = highestProductNumber + 1;
         const endNum = startNum + count - 1;
-        
+
         logger.info(`Will create new products from ${startNum} to ${endNum}`);
 
         // Get initial throttle status to determine optimal batch size
@@ -384,10 +393,10 @@ class ProductController {
             logger.info('Shutdown signal received, stopping batch processing');
             break;
           }
-          
+
           currentBatch++;
           const batchStartTime = Date.now();
-          
+
           logger.info(`Processing batch ${currentBatch}/${batches.length} (${batch.length} products)`);
 
           // Check throttle status before processing batch
@@ -439,7 +448,7 @@ class ProductController {
 
               try {
                 const response = await shopifyService.graphql(mutation);
-                
+
                 if (response.data?.productCreate?.userErrors?.length > 0) {
                   const userErrors = response.data.productCreate.userErrors;
                   logger.error(`Product ${productNum} creation errors:`, userErrors);
@@ -448,7 +457,7 @@ class ProductController {
                 } else if (response.data?.productCreate?.product) {
                   const product = response.data.productCreate.product;
                   successCount++;
-                  
+
                   // Only log every 250 products to reduce log noise
                   if (successCount % 250 === 0) {
                     logger.info(`Progress: ${successCount}/${count} products created (${((successCount/count)*100).toFixed(1)}%)`);
@@ -475,7 +484,7 @@ class ProductController {
           const batchDuration = (batchEndTime - batchStartTime) / 1000;
           const batchSuccessRate = (results.length / batch.length) * 100;
           const overallProgress = (successCount / count) * 100;
-          
+
           logger.info(
             `Batch ${currentBatch}/${batches.length} completed in ${batchDuration.toFixed(2)}s ` +
             `(${batchSuccessRate.toFixed(1)}% success rate, ${overallProgress.toFixed(1)}% total progress)`
@@ -485,7 +494,7 @@ class ProductController {
           const postThrottleStatus = await shopifyService.getThrottleStatus();
           if (postThrottleStatus) {
             logger.info(`Available points after batch: ${postThrottleStatus.currentlyAvailable}`);
-            
+
             // Only wait if we're critically low on points (less than 2% of maximum)
             if (postThrottleStatus.currentlyAvailable < (postThrottleStatus.maximumAvailable * 0.02)) {
               const restoreTarget = postThrottleStatus.maximumAvailable * 0.10; // Wait until 10% restored
@@ -507,9 +516,12 @@ class ProductController {
         logger.info(`Success rate: ${successRate.toFixed(1)}%`);
         logger.info(`Average time per product: ${avgTimePerProduct.toFixed(3)}s`);
         logger.info(`Throughput: ${throughput.toFixed(1)} products/second`);
-        
-        res.json({ 
-          success: true, 
+        if (successCount > 0) {
+          cache.clear(getShop(req));
+        }
+
+        res.json({
+          success: true,
           message: `Created ${successCount} out of ${count} products (${startNum} to ${endNum})`,
           results,
           errors,
@@ -534,9 +546,9 @@ class ProductController {
       } catch (error) {
         logger.error('Create multiple products failed', error);
         if (!res.headersSent) {
-          res.status(500).json({ 
-            success: false, 
-            error: error.message 
+          res.status(500).json({
+            success: false,
+            error: error.message
           });
         }
       }
@@ -559,9 +571,9 @@ class ProductController {
       res.json(status || { status: 'No current bulk operation' });
     } catch (error) {
       logger.error('Get bulk operation status failed', error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: error.message,
-        details: error.response?.data 
+        details: error.response?.data
       });
     }
   }
@@ -573,16 +585,16 @@ class ProductController {
     try {
       const shopifyService = new ShopifyService(req.shopifyConfig);
       const shopInfo = await shopifyService.getShopInfo();
-      res.json({ 
-        success: true, 
-        shop: shopInfo 
+      res.json({
+        success: true,
+        shop: shopInfo
       });
     } catch (error) {
       logger.error('Get shop info failed', error);
-      res.status(500).json({ 
+      res.status(500).json({
         success: false,
         error: error.message,
-        details: error.response?.data 
+        details: error.response?.data
       });
     }
   }
@@ -593,28 +605,28 @@ class ProductController {
   async deleteDummyProducts(req, res) {
     try {
       logger.info('Delete dummy products requested (ULTRA FAST MODE)');
-      
+
       // Create ShopifyService instance from request
       const shopifyService = new ShopifyService(req.shopifyConfig);
-      
+
       // First, fetch all products to find the ones with "dummy"
       const allProducts = await shopifyService.fetchAllProducts();
-      
+
       // Filter products that have "dummy" in handle or title (case-insensitive)
       const dummyProducts = allProducts.filter(product => {
         const title = product.title?.toLowerCase() || '';
         const handle = product.handle?.toLowerCase() || '';
         const hasDummy = title.includes('dummy') || handle.includes('dummy');
-        
+
         if (hasDummy) {
           logger.info(`Found dummy product: "${product.title}" (handle: ${product.handle}, id: ${product.id})`);
         }
-        
+
         return hasDummy;
       });
-      
+
       logger.info(`Filter complete. Found ${dummyProducts.length} dummy products out of ${allProducts.length} total products`);
-      
+
       if (dummyProducts.length === 0) {
         logger.warn(`NO DUMMY PRODUCTS FOUND! Searched ${allProducts.length} products but none had "dummy" in title or handle`);
         return res.json({
@@ -624,21 +636,21 @@ class ProductController {
           totalSearched: allProducts.length
         });
       }
-      
+
       logger.info(`Found ${dummyProducts.length} dummy products to delete:`);
       dummyProducts.forEach((p, idx) => {
         logger.info(`  ${idx + 1}. "${p.title}" (handle: ${p.handle})`);
       });
-      
+
       // Extract product IDs
       const productIds = dummyProducts.map(p => p.id);
-      
+
       // Track results
       let results = [];
       let processedCount = 0;
       const startTime = Date.now();
       const DELETE_COST = 10; // Approximate cost per delete mutation
-      
+
       // Process deletions with dynamic parallelism
       let productIdx = 0;
       while (productIdx < productIds.length) {
@@ -653,22 +665,22 @@ class ProductController {
           productIdx += conservativeBatch.length;
           continue;
         }
-        
+
         logger.throttle('DELETE_DUMMY', throttle);
-        
+
         // Calculate how many deletes we can do in parallel
         // Use 90% of available points to leave some buffer
         const availablePoints = Math.floor(throttle.currentlyAvailable * 0.9);
         const maxParallel = Math.max(1, Math.floor(availablePoints / DELETE_COST));
-        
+
         // Cap at a reasonable maximum to avoid overwhelming the system
         const parallelDeletes = Math.min(maxParallel, 200, productIds.length - productIdx);
-        
+
         logger.info(`[DELETE_DUMMY] Processing batch: ${productIdx}-${productIdx + parallelDeletes} of ${productIds.length} (${parallelDeletes} parallel deletes, ${availablePoints} points available)`);
-        
+
         // Get the batch of products to delete
         const batch = productIds.slice(productIdx, productIdx + parallelDeletes);
-        
+
         // Create delete promises for this batch
         const deletePromises = batch.map((productId, idx) => {
           const mutation = `
@@ -682,29 +694,29 @@ class ProductController {
               }
             }
           `;
-          
+
           const variables = {
             input: {
               id: productId
             }
           };
-          
+
           const itemNumber = productIdx + idx + 1;
-          
+
           return shopifyService.graphql(mutation, variables)
             .then(response => {
               if (response.data?.productDelete?.userErrors?.length > 0) {
                 logger.error(`❌ FAILED to delete product ${itemNumber}/${productIds.length} (${productId}):`, response.data.productDelete.userErrors);
                 return { productId, error: response.data.productDelete.userErrors };
               }
-              
+
               const deletedId = response.data?.productDelete?.deletedProductId;
               if (deletedId) {
                 logger.info(`✅ SUCCESSFULLY deleted product ${itemNumber}/${productIds.length}: ${deletedId}`);
               } else {
                 logger.warn(`⚠️ Delete response for ${itemNumber}/${productIds.length} missing deletedProductId`);
               }
-              
+
               return { productId, success: true, deletedId };
             })
             .catch(error => {
@@ -712,39 +724,43 @@ class ProductController {
               return { productId, error: error.message };
             });
         });
-        
+
         // Execute all deletes in this batch in parallel
         const batchResults = await Promise.all(deletePromises);
         results.push(...batchResults);
         processedCount += batch.length;
-        
+
         // Update index for next batch
         productIdx += parallelDeletes;
-        
+
         // Log progress
         const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
         const rate = (processedCount / elapsed).toFixed(1);
         logger.info(`[DELETE_DUMMY] Progress: ${processedCount}/${productIds.length} deleted in ${elapsed}s (${rate} products/sec)`);
-        
+
         // Small delay between batches to avoid rate limit issues
         if (productIdx < productIds.length) {
           await new Promise(r => setTimeout(r, 50));
         }
       }
-      
+
       // Calculate final results
       const successCount = results.filter(r => r.success).length;
       const failedCount = results.filter(r => r.error).length;
       const elapsedSeconds = ((Date.now() - startTime) / 1000).toFixed(2);
       const deleteRate = (successCount / elapsedSeconds).toFixed(1);
-      
+
       logger.info(`Delete operation completed in ${elapsedSeconds}s: ${successCount} succeeded, ${failedCount} failed (${deleteRate} products/sec)`);
-      
+
       // Get details of deleted products for response
       const deletedProducts = dummyProducts
         .filter(p => results.find(r => r.productId === p.id && r.success))
         .map(p => ({ id: p.id, title: p.title, handle: p.handle }));
-      
+
+      if (successCount > 0) {
+        cache.clear(getShop(req));
+      }
+
       res.json({
         success: true,
         message: `🚀 ULTRA FAST: Deleted ${successCount} dummy products in ${elapsedSeconds} seconds (${deleteRate} products/sec)`,
@@ -762,13 +778,13 @@ class ProductController {
           rate: deleteRate
         }
       });
-      
+
     } catch (error) {
       logger.error('Delete dummy products failed', error);
-      res.status(500).json({ 
+      res.status(500).json({
         success: false,
         error: error.message,
-        details: error.response?.data 
+        details: error.response?.data
       });
     }
   }
@@ -789,29 +805,29 @@ class ProductController {
           }
         }
       `;
-      
+
       const variables = {
         input: {
           id: productId
         }
       };
-      
+
       const itemNumber = startIdx + idx + 1;
-      
+
       return shopifyService.graphql(mutation, variables)
         .then(response => {
           if (response.data?.productDelete?.userErrors?.length > 0) {
             logger.error(`❌ FAILED to delete product ${itemNumber}/${totalCount} (${productId}):`, response.data.productDelete.userErrors);
             return { productId, error: response.data.productDelete.userErrors };
           }
-          
+
           const deletedId = response.data?.productDelete?.deletedProductId;
           if (deletedId) {
             logger.info(`✅ SUCCESSFULLY deleted product ${itemNumber}/${totalCount}: ${deletedId}`);
           } else {
             logger.warn(`⚠️ Delete response for ${itemNumber}/${totalCount} missing deletedProductId`);
           }
-          
+
           return { productId, success: true, deletedId };
         })
         .catch(error => {
@@ -819,9 +835,9 @@ class ProductController {
           return { productId, error: error.message };
         });
     });
-    
+
     return Promise.all(deletePromises);
   }
 }
 
-module.exports = new ProductController(); 
+module.exports = new ProductController();
