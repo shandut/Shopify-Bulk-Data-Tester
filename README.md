@@ -30,20 +30,23 @@ Shopify-Bulk-Data-Tester/
 
 ### Prerequisites
 - Node.js >= 14.0.0
-- npm or yarn
+- pnpm, npm, or yarn
 - Shopify store with Admin API access
 
 ### 1. Installation
 ```bash
 git clone https://github.com/shandut/Shopify-Bulk-Data-Tester.git
 cd Shopify-Bulk-Data-Tester
+pnpm install
+
+# Or with npm
 npm install
 ```
 
 ### 2. Environment Setup
 
 #### Option A: Use the Settings Interface (Recommended)
-1. Start the application (`npm run dev`)
+1. Start the application (`pnpm run dev` or `npm run dev`)
 2. Navigate to the **Settings** tab in the UI
 3. Enter your Shopify credentials:
    - Store URL (e.g., `your-shop` or `your-shop.myshopify.com`)
@@ -64,7 +67,8 @@ NODE_ENV=development
 
 #### Option A: Development Mode (Both Frontend & Backend)
 ```bash
-npm run dev
+pnpm run dev
+# or: npm run dev
 ```
 This starts:
 - 🔧 **Backend**: http://localhost:4000 (API server)
@@ -73,19 +77,23 @@ This starts:
 #### Option B: Individual Components
 ```bash
 # Backend only
-npm run dev:backend
+pnpm run dev:backend
+# or: npm run dev:backend
 
 # Frontend only  
-npm run dev:frontend
+pnpm run dev:frontend
+# or: npm run dev:frontend
 ```
 
 #### Option C: Production Mode
 ```bash
 # Build frontend for production
-npm run build
+pnpm run build
+# or: npm run build
 
 # Start backend in production
-npm start
+pnpm start
+# or: npm start
 ```
 
 ## 📚 API Endpoints
@@ -242,18 +250,19 @@ After Shopify redirects back, the backend verifies the callback and exchanges th
 
 ```bash
 # Full development environment
-npm run dev                 # Frontend (3000) + Backend (4000)
+pnpm run dev                # Frontend (3000) + Backend (4000)
+npm run dev                 # npm equivalent
 
 # Individual services
-npm run dev:backend        # Backend only (4000)
-npm run dev:frontend       # Frontend only (3000)
+pnpm run dev:backend        # Backend only (4000)
+pnpm run dev:frontend       # Frontend only (3000)
 
 # Production
-npm run build              # Build frontend for production
-npm start                  # Start backend in production
+pnpm run build              # Build frontend for production
+pnpm start                  # Start backend in production
 
 # Testing
-npm test                   # Run React tests
+pnpm test                   # Run React tests
 ```
 
 ## 🌐 Ports & URLs
@@ -280,7 +289,8 @@ The backend provides structured logging:
 
 ### Frontend (React)
 ```bash
-npm run build
+pnpm run build
+# or: npm run build
 # Deploy the build/ folder to your hosting service
 ```
 
@@ -292,7 +302,8 @@ export SHOPIFY_ACCESS_TOKEN=your_token
 export NODE_ENV=production
 
 # Start the server
-npm start
+pnpm start
+# or: npm start
 ```
 
 ## 🆕 Latest Updates (v2.0)

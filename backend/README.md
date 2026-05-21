@@ -62,6 +62,9 @@ backend/
    ```bash
    git clone https://github.com/shandut/Shopify-Bulk-Data-Tester.git
    cd Shopify-Bulk-Data-Tester
+   pnpm install
+
+   # Or with npm
    npm install
    ```
 
@@ -73,8 +76,12 @@ backend/
 
 3. **Start Development Server**:
    ```bash
-   npm run dev     # With hot-reload
-   npm start       # Production mode
+   pnpm run dev    # With hot-reload
+   pnpm start      # Production mode
+
+   # Or with npm
+   npm run dev
+   npm start
    ```
 
 ## 🔧 Configuration
@@ -216,9 +223,14 @@ curl http://localhost:4000/health
 
 ### Scripts
 ```bash
-npm run dev      # Development with hot-reload
-npm start        # Production server
-npm run legacy   # Run old monolithic version
+pnpm run dev      # Development with hot-reload
+pnpm start        # Production server
+pnpm run legacy   # Run old monolithic version
+
+# npm equivalents
+npm run dev
+npm start
+npm run legacy
 ```
 
 ### Code Structure
